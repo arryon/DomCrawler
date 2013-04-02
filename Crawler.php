@@ -175,8 +175,9 @@ class Crawler extends \SplObjectStorage
         $dom->validateOnParse = true;
 
         // remove the default namespace to make XPath expressions simpler
-        @$dom->loadXML(str_replace('xmlns', 'ns', $content), LIBXML_NONET);
-
+        //@$dom->loadXML(str_replace('xmlns', 'ns', $content), LIBXML_NONET);
+        $dom -> loadXML($content, LIBXML_NONET);
+        
         libxml_use_internal_errors($current);
         libxml_disable_entity_loader($disableEntities);
 
@@ -522,11 +523,23 @@ class Crawler extends \SplObjectStorage
     {
         $document = new \DOMDocument('1.0', 'UTF-8');
         $root = $document->appendChild($document->createElement('_root'));
+		$rootNamespace = "";
         foreach ($this as $node) {
+			$rootNamespace = $node -> getAttribute("xmlns");
             $root->appendChild($document->importNode($node, true));
         }
 
         $domxpath = new \DOMXPath($document);
+		$domxpath -> registerNamespace("", $rootNamespace);
+        if (preg_match_all('/(?P<prefix>[a-zA-Z_][a-zA-Z_0-9\-\.]*):[^:]/', $xpath, $matches)) {
+            foreach ($matches['prefix'] as $prefix) {
+                // ask for one namespace, otherwise we'd get a collection with an item for each node
+                $namespaces = $domxpath->query(sprintf('(//namespace::*[name()="%s"])[last()]', $prefix));
+                foreach ($namespaces as $node) {
+                    $domxpath->registerNamespace($node->prefix, $node->nodeValue);
+                }
+            }
+        }
 
         return new static($domxpath->query($xpath), $this->uri);
     }
