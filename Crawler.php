@@ -27,6 +27,12 @@ class Crawler extends \SplObjectStorage
      */
     protected $uri;
 
+    
+    /**
+     * @var string a collection of registered namespaces to apply
+     */
+    protected $namespaces;
+    
     /**
      * Constructor.
      *
@@ -38,6 +44,8 @@ class Crawler extends \SplObjectStorage
     public function __construct($node = null, $uri = null)
     {
         $this->uri = $uri;
+        
+        $this->namespaces = Array();
 
         $this->add($node);
     }
@@ -240,6 +248,30 @@ class Crawler extends \SplObjectStorage
         } else {
             $this->attach($node);
         }
+    }
+    
+    /**
+     * Adds a namespace to the list of namespaces to register in the DomXPath class
+     *
+     * @param $prefix The prefix of the namespace used in a query
+     *
+     * @param $url URL of the namespace
+     *
+     * @param $overwrite Boolean that specifies wether an existing prefix should be overwritten
+     *
+     * @throws \InvalidArgumentException If $overwrite is false and prefix already exists
+     *
+     * @api
+     */
+    public function addNamespace($prefix, $url, $overwrite=false)
+    {
+        //check if prefix is defined in namespaces
+        if (array_key_exists($prefix, $this->namespaces) && !$overwrite)
+        {
+                throw new \InvalidArgumentException(sprintf("Specified namespace prefix '%s' exists, and overwrite is disabled", $prefix));
+        }
+        
+        $this->namespaces[$prefix] = $url;
     }
 
     /**
@@ -530,7 +562,13 @@ class Crawler extends \SplObjectStorage
         }
 
         $domxpath = new \DOMXPath($document);
-		$domxpath -> registerNamespace("", $rootNamespace);
+		$domxpath -> registerNamespace("default", $rootNamespace);
+        
+        foreach ($this->namespaces as $prefix => $url)
+        {
+            $domxpath->registerNamespace($prefix, $url);
+        }
+        
         if (preg_match_all('/(?P<prefix>[a-zA-Z_][a-zA-Z_0-9\-\.]*):[^:]/', $xpath, $matches)) {
             foreach ($matches['prefix'] as $prefix) {
                 // ask for one namespace, otherwise we'd get a collection with an item for each node
